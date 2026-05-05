@@ -17,210 +17,195 @@ permissions:
 
 env:
   RELEASE_TAG: ${{ inputs.release_tag }}
+  MICROSOFT_STORE_ID: 9P467L4RBQXH
+  WINDOWS_PACKAGE_IDENTITY_NAME: Keldos.BlockInsight
+  WINDOWS_PACKAGE_PUBLISHER: CN=F3CEF3DF-A14E-4DDD-875E-DE0378559A97
 
 jobs:
-  sync:
-    name: Sync Store-signed MSIX (${{ matrix.label }})
+  attempt-now:
+    name: Sync Store-signed MSIX (now)
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: ${{ matrix.environment }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - label: now
-            environment: store-msix-sync-now
-            final: 'false'
-          - label: 30m
-            environment: store-msix-sync-30m
-            final: 'false'
-          - label: 1h
-            environment: store-msix-sync-1h
-            final: 'false'
-          - label: 3h
-            environment: store-msix-sync-3h
-            final: 'false'
-          - label: 6h
-            environment: store-msix-sync-6h
-            final: 'true'
+    environment: store-msix-sync-now
+    outputs:
+      synced: ${{ steps.finalize.outputs.synced || steps.check.outputs.synced }}
     steps:
+      - name: Checkout release automation
+        uses: actions/checkout@v4
+
       - name: Check whether sync is still needed
         id: check
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          release_json="$(gh release view "$RELEASE_TAG" --json isDraft,assets)"
-          is_draft="$(jq -r '.isDraft' <<< "$release_json")"
-          has_appinstaller="$(jq -r '[.assets[].name] | index("BlockInsight.appinstaller") != null' <<< "$release_json")"
-
-          if [ "$is_draft" != "true" ] || [ "$has_appinstaller" = "true" ]; then
-            echo "Store MSIX sync is already complete for $RELEASE_TAG."
-            echo "should_sync=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          echo "should_sync=true" >> "$GITHUB_OUTPUT"
+        run: node .github/scripts/sync-store-msix.cjs check
 
       - name: Upload Store MSIX to release
         if: steps.check.outputs.should_sync == 'true'
         continue-on-error: true
         uses: JasonWei512/Upload-Microsoft-Store-MSIX-Package-to-GitHub-Release@v1
         with:
-          store-id: ${{ secrets.MICROSOFT_STORE_ID }}
+          store-id: ${{ env.MICROSOFT_STORE_ID }}
           token: ${{ github.token }}
           asset-name-pattern: BlockInsight_{version}_{arch}
 
-      - name: Prepare App Installer and release notes
+      - name: Finalize release if Store MSIX is available
         if: steps.check.outputs.should_sync == 'true'
-        id: prepare
+        id: finalize
         env:
           GH_TOKEN: ${{ github.token }}
-          IDENTITY_NAME: ${{ secrets.BLOCKINSIGHT_WINDOWS_PACKAGE_IDENTITY_NAME }}
-          PUBLISHER: ${{ secrets.BLOCKINSIGHT_WINDOWS_PACKAGE_PUBLISHER }}
-        run: |
-          node <<'NODE'
-          const fs = require('fs')
-          const { execFileSync } = require('child_process')
+          FINAL_ATTEMPT: 'false'
+          IDENTITY_NAME: ${{ env.WINDOWS_PACKAGE_IDENTITY_NAME }}
+          PUBLISHER: ${{ env.WINDOWS_PACKAGE_PUBLISHER }}
+        run: node .github/scripts/sync-store-msix.cjs finalize
 
-          const tag = process.env.RELEASE_TAG
-          const repo = process.env.GITHUB_REPOSITORY
-          const outputPath = process.env.GITHUB_OUTPUT
-          const tmpDir = process.env.RUNNER_TEMP
+  attempt-30m:
+    name: Sync Store-signed MSIX (30m)
+    needs: attempt-now
+    if: always() && needs.attempt-now.outputs.synced != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: store-msix-sync-30m
+    outputs:
+      synced: ${{ steps.finalize.outputs.synced || steps.check.outputs.synced }}
+    steps:
+      - name: Checkout release automation
+        uses: actions/checkout@v4
 
-          function xmlEscape(value) {
-            return String(value)
-              .replace(/&/g, '&amp;')
-              .replace(/"/g, '&quot;')
-              .replace(/</g, '&lt;')
-              .replace(/>/g, '&gt;')
-          }
-
-          function releaseDownloadUrl(assetName) {
-            return `https://github.com/${repo}/releases/download/${encodeURIComponent(tag)}/${encodeURIComponent(assetName)}`
-          }
-
-          function latestDownloadUrl(assetName) {
-            return `https://github.com/${repo}/releases/latest/download/${encodeURIComponent(assetName)}`
-          }
-
-          function appendOutput(name, value) {
-            fs.appendFileSync(outputPath, `${name}=${value}\n`)
-          }
-
-          const release = JSON.parse(
-            execFileSync('gh', ['release', 'view', tag, '--json', 'assets,body,databaseId'], {
-              encoding: 'utf8'
-            })
-          )
-          const assets = Array.isArray(release.assets) ? release.assets : []
-          const packageAsset =
-            assets.find((asset) => /x64.*\.(msixbundle|appxbundle|msix|appx)$/i.test(asset.name)) ||
-            assets.find((asset) => /\.(msixbundle|appxbundle|msix|appx)$/i.test(asset.name))
-
-          if (!packageAsset) {
-            appendOutput('package_found', 'false')
-            process.exit(0)
-          }
-
-          const identityName = process.env.IDENTITY_NAME
-          const publisher = process.env.PUBLISHER
-          if (!identityName || !publisher) {
-            throw new Error(
-              'BLOCKINSIGHT_WINDOWS_PACKAGE_IDENTITY_NAME and BLOCKINSIGHT_WINDOWS_PACKAGE_PUBLISHER secrets are required.'
-            )
-          }
-
-          const versionMatch = packageAsset.name.match(/(\d+\.\d+\.\d+\.\d+)/)
-          if (!versionMatch) {
-            throw new Error(`Cannot infer Windows package version from ${packageAsset.name}.`)
-          }
-
-          const packageVersion = versionMatch[1]
-          const packageKind = /\.(msixbundle|appxbundle)$/i.test(packageAsset.name)
-            ? 'MainBundle'
-            : 'MainPackage'
-          const architecture = packageKind === 'MainPackage' ? ' ProcessorArchitecture="x64"' : ''
-          const appInstallerPath = `${tmpDir}/BlockInsight.appinstaller`
-          const appInstallerXml = `<?xml version="1.0" encoding="utf-8"?>
-          <AppInstaller
-            xmlns="http://schemas.microsoft.com/appx/appinstaller/2021"
-            Version="${xmlEscape(packageVersion)}"
-            Uri="${xmlEscape(latestDownloadUrl('BlockInsight.appinstaller'))}">
-
-            <${packageKind}
-              Name="${xmlEscape(identityName)}"
-              Publisher="${xmlEscape(publisher)}"
-              Version="${xmlEscape(packageVersion)}"${architecture}
-              Uri="${xmlEscape(releaseDownloadUrl(packageAsset.name))}" />
-
-            <UpdateSettings>
-              <OnLaunch HoursBetweenUpdateChecks="12" />
-              <AutomaticBackgroundTask />
-            </UpdateSettings>
-          </AppInstaller>
-          `
-          fs.writeFileSync(appInstallerPath, appInstallerXml)
-
-          const macArm64Asset =
-            assets.find((asset) => /arm64.*\.dmg$/i.test(asset.name)) ||
-            assets.find((asset) => /\.dmg$/i.test(asset.name))
-          const macX64Asset = assets.find((asset) => /x64.*\.dmg$/i.test(asset.name))
-          const lines = ['## 下载', '']
-          lines.push(`Windows：[点击下载（x64）](${latestDownloadUrl('BlockInsight.appinstaller')})`)
-
-          const arm64Text = macArm64Asset
-            ? `[点击下载（M 芯片）](${releaseDownloadUrl(macArm64Asset.name)})`
-            : 'M 芯片安装包上传后会在这里显示下载链接'
-          const x64Text = macX64Asset
-            ? `[点击下载（intel 芯片）](${releaseDownloadUrl(macX64Asset.name)})`
-            : 'intel 芯片安装包上传后会在这里显示下载链接'
-          lines.push(`macOS：${arm64Text}｜ ${x64Text}`)
-
-          const existingBody = typeof release.body === 'string' ? release.body.trim() : ''
-          const changelogIndex = existingBody.indexOf('## 更新日志')
-          if (changelogIndex >= 0) {
-            lines.push('', existingBody.slice(changelogIndex).trim())
-          } else if (existingBody && !existingBody.startsWith('## 下载')) {
-            lines.push('', '## 更新日志', '', existingBody)
-          }
-
-          const notesPath = `${tmpDir}/release-notes.md`
-          fs.writeFileSync(notesPath, lines.join('\n'))
-          appendOutput('package_found', 'true')
-          appendOutput('release_id', String(release.databaseId))
-          appendOutput('appinstaller_path', appInstallerPath)
-          appendOutput('notes_path', notesPath)
-          NODE
-
-      - name: Skip unavailable Store MSIX
-        if: steps.check.outputs.should_sync == 'true' && steps.prepare.outputs.package_found != 'true' && matrix.final != 'true'
-        run: echo "Store-signed MSIX is not available yet for $RELEASE_TAG."
-
-      - name: Report missing Store MSIX after final attempt
-        if: steps.check.outputs.should_sync == 'true' && steps.prepare.outputs.package_found != 'true' && matrix.final == 'true'
+      - name: Check whether sync is still needed
+        id: check
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          marker_path="$RUNNER_TEMP/store-msix-sync-timeout.txt"
-          {
-            echo "Store-signed MSIX was not available after the final sync attempt."
-            echo "Release tag: $RELEASE_TAG"
-            echo "Checked at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          } > "$marker_path"
-          gh release upload "$RELEASE_TAG" "$marker_path" --clobber
-          echo "::error::Store-signed MSIX was not available after the final sync attempt for $RELEASE_TAG."
-          exit 1
+        run: node .github/scripts/sync-store-msix.cjs check
 
-      - name: Upload BlockInsight.appinstaller
-        if: steps.check.outputs.should_sync == 'true' && steps.prepare.outputs.package_found == 'true'
+      - name: Upload Store MSIX to release
+        if: steps.check.outputs.should_sync == 'true'
+        continue-on-error: true
+        uses: JasonWei512/Upload-Microsoft-Store-MSIX-Package-to-GitHub-Release@v1
+        with:
+          store-id: ${{ env.MICROSOFT_STORE_ID }}
+          token: ${{ github.token }}
+          asset-name-pattern: BlockInsight_{version}_{arch}
+
+      - name: Finalize release if Store MSIX is available
+        if: steps.check.outputs.should_sync == 'true'
+        id: finalize
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release delete-asset "$RELEASE_TAG" BlockInsight.appinstaller --yes || true
-          gh release delete-asset "$RELEASE_TAG" store-msix-sync-timeout.txt --yes || true
-          gh release upload "$RELEASE_TAG" "${{ steps.prepare.outputs.appinstaller_path }}" --clobber
-          gh release edit "$RELEASE_TAG" --notes-file "${{ steps.prepare.outputs.notes_path }}"
-          gh api \
-            -X PATCH \
-            "/repos/$GITHUB_REPOSITORY/releases/${{ steps.prepare.outputs.release_id }}" \
-            -F draft=false
+          FINAL_ATTEMPT: 'false'
+          IDENTITY_NAME: ${{ env.WINDOWS_PACKAGE_IDENTITY_NAME }}
+          PUBLISHER: ${{ env.WINDOWS_PACKAGE_PUBLISHER }}
+        run: node .github/scripts/sync-store-msix.cjs finalize
+
+  attempt-1h:
+    name: Sync Store-signed MSIX (1h)
+    needs: attempt-30m
+    if: always() && needs.attempt-30m.outputs.synced != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: store-msix-sync-1h
+    outputs:
+      synced: ${{ steps.finalize.outputs.synced || steps.check.outputs.synced }}
+    steps:
+      - name: Checkout release automation
+        uses: actions/checkout@v4
+
+      - name: Check whether sync is still needed
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/sync-store-msix.cjs check
+
+      - name: Upload Store MSIX to release
+        if: steps.check.outputs.should_sync == 'true'
+        continue-on-error: true
+        uses: JasonWei512/Upload-Microsoft-Store-MSIX-Package-to-GitHub-Release@v1
+        with:
+          store-id: ${{ env.MICROSOFT_STORE_ID }}
+          token: ${{ github.token }}
+          asset-name-pattern: BlockInsight_{version}_{arch}
+
+      - name: Finalize release if Store MSIX is available
+        if: steps.check.outputs.should_sync == 'true'
+        id: finalize
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FINAL_ATTEMPT: 'false'
+          IDENTITY_NAME: ${{ env.WINDOWS_PACKAGE_IDENTITY_NAME }}
+          PUBLISHER: ${{ env.WINDOWS_PACKAGE_PUBLISHER }}
+        run: node .github/scripts/sync-store-msix.cjs finalize
+
+  attempt-3h:
+    name: Sync Store-signed MSIX (3h)
+    needs: attempt-1h
+    if: always() && needs.attempt-1h.outputs.synced != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: store-msix-sync-3h
+    outputs:
+      synced: ${{ steps.finalize.outputs.synced || steps.check.outputs.synced }}
+    steps:
+      - name: Checkout release automation
+        uses: actions/checkout@v4
+
+      - name: Check whether sync is still needed
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/sync-store-msix.cjs check
+
+      - name: Upload Store MSIX to release
+        if: steps.check.outputs.should_sync == 'true'
+        continue-on-error: true
+        uses: JasonWei512/Upload-Microsoft-Store-MSIX-Package-to-GitHub-Release@v1
+        with:
+          store-id: ${{ env.MICROSOFT_STORE_ID }}
+          token: ${{ github.token }}
+          asset-name-pattern: BlockInsight_{version}_{arch}
+
+      - name: Finalize release if Store MSIX is available
+        if: steps.check.outputs.should_sync == 'true'
+        id: finalize
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FINAL_ATTEMPT: 'false'
+          IDENTITY_NAME: ${{ env.WINDOWS_PACKAGE_IDENTITY_NAME }}
+          PUBLISHER: ${{ env.WINDOWS_PACKAGE_PUBLISHER }}
+        run: node .github/scripts/sync-store-msix.cjs finalize
+
+  attempt-6h:
+    name: Sync Store-signed MSIX (6h)
+    needs: attempt-3h
+    if: always() && needs.attempt-3h.outputs.synced != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: store-msix-sync-6h
+    outputs:
+      synced: ${{ steps.finalize.outputs.synced || steps.check.outputs.synced }}
+    steps:
+      - name: Checkout release automation
+        uses: actions/checkout@v4
+
+      - name: Check whether sync is still needed
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/sync-store-msix.cjs check
+
+      - name: Upload Store MSIX to release
+        if: steps.check.outputs.should_sync == 'true'
+        continue-on-error: true
+        uses: JasonWei512/Upload-Microsoft-Store-MSIX-Package-to-GitHub-Release@v1
+        with:
+          store-id: ${{ env.MICROSOFT_STORE_ID }}
+          token: ${{ github.token }}
+          asset-name-pattern: BlockInsight_{version}_{arch}
+
+      - name: Finalize release if Store MSIX is available
+        if: steps.check.outputs.should_sync == 'true'
+        id: finalize
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FINAL_ATTEMPT: 'true'
+          IDENTITY_NAME: ${{ env.WINDOWS_PACKAGE_IDENTITY_NAME }}
+          PUBLISHER: ${{ env.WINDOWS_PACKAGE_PUBLISHER }}
+        run: node .github/scripts/sync-store-msix.cjs finalize
