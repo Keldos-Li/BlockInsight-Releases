@@ -110,13 +110,13 @@ function buildReleaseNotes(release) {
   const macX64Asset = assets.find((asset) => /x64.*\.dmg$/i.test(asset.name))
   const lines = ['## 下载', '']
 
-  lines.push(`Windows：[点击下载（x64）](${latestDownloadUrl('BlockInsight.appinstaller')})`)
+  lines.push(`Windows：[x64](${latestDownloadUrl('BlockInsight.appinstaller')})`)
 
   const arm64Text = macArm64Asset
-    ? `[点击下载（M 芯片）](${releaseDownloadUrl(macArm64Asset.name)})`
+    ? `[M 芯片](${releaseDownloadUrl(macArm64Asset.name)})`
     : 'M 芯片安装包上传后会在这里显示下载链接'
   const x64Text = macX64Asset
-    ? `[点击下载（intel 芯片）](${releaseDownloadUrl(macX64Asset.name)})`
+    ? `[intel 芯片](${releaseDownloadUrl(macX64Asset.name)})`
     : 'intel 芯片安装包上传后会在这里显示下载链接'
   lines.push(`macOS：${arm64Text}｜ ${x64Text}`)
 
