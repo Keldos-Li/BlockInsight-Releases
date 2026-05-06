@@ -18,11 +18,19 @@ function appendOutput(name, value) {
 }
 
 function gh(args) {
-  return execFileSync('gh', args, { encoding: 'utf8' })
+  return execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
 }
 
 function getRelease() {
-  return JSON.parse(gh(['release', 'view', tag, '--json', 'assets,body,databaseId,isDraft']))
+  try {
+    return JSON.parse(gh(['release', 'view', tag, '--json', 'assets,body,databaseId,isDraft']))
+  } catch (error) {
+    const stderr = String(error.stderr || error.output?.[2] || '')
+    if (stderr.includes('release not found')) {
+      return null
+    }
+    throw error
+  }
 }
 
 function xmlEscape(value) {
@@ -54,6 +62,13 @@ function hasAsset(assets, name) {
 
 function check() {
   const release = getRelease()
+  if (!release) {
+    console.log(`Release ${tag} no longer exists. Store MSIX sync is no longer needed.`)
+    appendOutput('should_sync', 'false')
+    appendOutput('synced', 'true')
+    return
+  }
+
   const assets = Array.isArray(release.assets) ? release.assets : []
   const complete = release.isDraft !== true || hasAsset(assets, 'BlockInsight.appinstaller')
 
@@ -146,6 +161,12 @@ function uploadTimeoutMarker() {
 
 function finalize() {
   const release = getRelease()
+  if (!release) {
+    console.log(`Release ${tag} no longer exists. Store MSIX sync is no longer needed.`)
+    appendOutput('synced', 'true')
+    return
+  }
+
   const assets = Array.isArray(release.assets) ? release.assets : []
   const packageAsset = findPackageAsset(assets)
 
