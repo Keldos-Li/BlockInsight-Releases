@@ -140,7 +140,7 @@ function buildReleaseNotes(release) {
   const exeText = winExeAsset
     ? `[exe](${releaseDownloadUrl(winExeAsset.name)})`
     : 'x64 exe 上传后会在这里显示下载链接'
-  lines.push(`Windows (x64)：${appInstallerText}｜ ${microsoftStoreText}｜ ${appxText}｜ ${exeText}`)
+  lines.push(`Windows (x64)：${appInstallerText}｜${microsoftStoreText}｜${appxText}｜${exeText}`)
 
   const arm64Text = macArm64Asset
     ? `[M 芯片](${releaseDownloadUrl(macArm64Asset.name)})`
@@ -148,7 +148,7 @@ function buildReleaseNotes(release) {
   const x64Text = macX64Asset
     ? `[intel 芯片](${releaseDownloadUrl(macX64Asset.name)})`
     : 'intel 芯片安装包上传后会在这里显示下载链接'
-  lines.push(`macOS：${arm64Text}｜ ${x64Text}`)
+  lines.push(`macOS：${arm64Text}｜${x64Text}`)
 
   const existingBody = typeof release.body === 'string' ? release.body.trim() : ''
   const changelogIndex = existingBody.indexOf('## 更新日志')
