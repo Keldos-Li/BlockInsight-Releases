@@ -22,25 +22,22 @@ env:
   WINDOWS_PACKAGE_PUBLISHER: CN=F3CEF3DF-A14E-4DDD-875E-DE0378559A97
 
 jobs:
-  attempt-now:
-    name: Sync Store-signed MSIX (now)
+  sync:
+    name: Sync Store-signed MSIX
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: store-msix-sync-now
-    outputs:
-      synced: ${{ steps.result.outputs.synced }}
+    timeout-minutes: 240
     steps:
       - name: Checkout release automation
         uses: actions/checkout@v4
 
-      - name: Check whether sync is still needed
-        id: check
+      - name: Check whether sync is still needed (now)
+        id: check-now
         env:
           GH_TOKEN: ${{ github.token }}
         run: node .github/scripts/sync-store-msix.cjs check
 
-      - name: Upload Store MSIX to release
-        if: steps.check.outputs.should_sync == 'true'
+      - name: Upload Store MSIX to release (now)
+        if: steps.check-now.outputs.should_sync == 'true'
         continue-on-error: true
         uses: JasonWei512/Upload-Microsoft-Store-MSIX-Package-to-GitHub-Release@v1
         with:
@@ -48,9 +45,9 @@ jobs:
           token: ${{ github.token }}
           asset-name-pattern: BlockInsight_{version}_{arch}
 
-      - name: Finalize release if Store MSIX is available
-        if: steps.check.outputs.should_sync == 'true'
-        id: finalize
+      - name: Finalize release if Store MSIX is available (now)
+        if: steps.check-now.outputs.should_sync == 'true'
+        id: finalize-now
         env:
           GH_TOKEN: ${{ github.token }}
           FINAL_ATTEMPT: 'false'
@@ -58,40 +55,19 @@ jobs:
           PUBLISHER: ${{ env.WINDOWS_PACKAGE_PUBLISHER }}
         run: node .github/scripts/sync-store-msix.cjs finalize
 
-      - name: Set sync result
-        if: always()
-        id: result
-        env:
-          CHECK_SYNCED: ${{ steps.check.outputs.synced }}
-          FINALIZE_SYNCED: ${{ steps.finalize.outputs.synced }}
-        run: |
-          if [ "$FINALIZE_SYNCED" = "true" ] || [ "$CHECK_SYNCED" = "true" ]; then
-            echo "synced=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "synced=false" >> "$GITHUB_OUTPUT"
-          fi
+      - name: Wait before retry (30m)
+        if: steps.check-now.outputs.synced != 'true' && steps.finalize-now.outputs.synced != 'true'
+        run: sleep 1800
 
-  attempt-30m:
-    name: Sync Store-signed MSIX (30m)
-    needs: attempt-now
-    if: always() && needs.attempt-now.outputs.synced != 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: store-msix-sync-30m
-    outputs:
-      synced: ${{ steps.result.outputs.synced }}
-    steps:
-      - name: Checkout release automation
-        uses: actions/checkout@v4
-
-      - name: Check whether sync is still needed
-        id: check
+      - name: Check whether sync is still needed (30m)
+        id: check-30m
+        if: steps.check-now.outputs.synced != 'true' && steps.finalize-now.outputs.synced != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: node .github/scripts/sync-store-msix.cjs check
 
-      - name: Upload Store MSIX to release
-        if: steps.check.outputs.should_sync == 'true'
+      - name: Upload Store MSIX to release (30m)
+        if: steps.check-30m.outputs.should_sync == 'true'
         continue-on-error: true
         uses: JasonWei512/Upload-Microsoft-Store-MSIX-Package-to-GitHub-Release@v1
         with:
@@ -99,9 +75,9 @@ jobs:
           token: ${{ github.token }}
           asset-name-pattern: BlockInsight_{version}_{arch}
 
-      - name: Finalize release if Store MSIX is available
-        if: steps.check.outputs.should_sync == 'true'
-        id: finalize
+      - name: Finalize release if Store MSIX is available (30m)
+        if: steps.check-30m.outputs.should_sync == 'true'
+        id: finalize-30m
         env:
           GH_TOKEN: ${{ github.token }}
           FINAL_ATTEMPT: 'false'
@@ -109,42 +85,19 @@ jobs:
           PUBLISHER: ${{ env.WINDOWS_PACKAGE_PUBLISHER }}
         run: node .github/scripts/sync-store-msix.cjs finalize
 
-      - name: Set sync result
-        if: always()
-        id: result
-        env:
-          CHECK_SYNCED: ${{ steps.check.outputs.synced }}
-          FINALIZE_SYNCED: ${{ steps.finalize.outputs.synced }}
-        run: |
-          if [ "$FINALIZE_SYNCED" = "true" ] || [ "$CHECK_SYNCED" = "true" ]; then
-            echo "synced=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "synced=false" >> "$GITHUB_OUTPUT"
-          fi
+      - name: Wait before retry (1h)
+        if: steps.check-30m.outputs.synced == 'false' && steps.finalize-30m.outputs.synced != 'true'
+        run: sleep 1800
 
-  attempt-1h:
-    name: Sync Store-signed MSIX (1h)
-    needs:
-      - attempt-now
-      - attempt-30m
-    if: always() && needs.attempt-now.outputs.synced != 'true' && needs.attempt-30m.outputs.synced != 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: store-msix-sync-1h
-    outputs:
-      synced: ${{ steps.result.outputs.synced }}
-    steps:
-      - name: Checkout release automation
-        uses: actions/checkout@v4
-
-      - name: Check whether sync is still needed
-        id: check
+      - name: Check whether sync is still needed (1h)
+        id: check-1h
+        if: steps.check-30m.outputs.synced == 'false' && steps.finalize-30m.outputs.synced != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: node .github/scripts/sync-store-msix.cjs check
 
-      - name: Upload Store MSIX to release
-        if: steps.check.outputs.should_sync == 'true'
+      - name: Upload Store MSIX to release (1h)
+        if: steps.check-1h.outputs.should_sync == 'true'
         continue-on-error: true
         uses: JasonWei512/Upload-Microsoft-Store-MSIX-Package-to-GitHub-Release@v1
         with:
@@ -152,9 +105,9 @@ jobs:
           token: ${{ github.token }}
           asset-name-pattern: BlockInsight_{version}_{arch}
 
-      - name: Finalize release if Store MSIX is available
-        if: steps.check.outputs.should_sync == 'true'
-        id: finalize
+      - name: Finalize release if Store MSIX is available (1h)
+        if: steps.check-1h.outputs.should_sync == 'true'
+        id: finalize-1h
         env:
           GH_TOKEN: ${{ github.token }}
           FINAL_ATTEMPT: 'false'
@@ -162,43 +115,19 @@ jobs:
           PUBLISHER: ${{ env.WINDOWS_PACKAGE_PUBLISHER }}
         run: node .github/scripts/sync-store-msix.cjs finalize
 
-      - name: Set sync result
-        if: always()
-        id: result
-        env:
-          CHECK_SYNCED: ${{ steps.check.outputs.synced }}
-          FINALIZE_SYNCED: ${{ steps.finalize.outputs.synced }}
-        run: |
-          if [ "$FINALIZE_SYNCED" = "true" ] || [ "$CHECK_SYNCED" = "true" ]; then
-            echo "synced=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "synced=false" >> "$GITHUB_OUTPUT"
-          fi
+      - name: Wait before retry (3h)
+        if: steps.check-1h.outputs.synced == 'false' && steps.finalize-1h.outputs.synced != 'true'
+        run: sleep 7200
 
-  attempt-3h:
-    name: Sync Store-signed MSIX (3h)
-    needs:
-      - attempt-now
-      - attempt-30m
-      - attempt-1h
-    if: always() && needs.attempt-now.outputs.synced != 'true' && needs.attempt-30m.outputs.synced != 'true' && needs.attempt-1h.outputs.synced != 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: store-msix-sync-3h
-    outputs:
-      synced: ${{ steps.result.outputs.synced }}
-    steps:
-      - name: Checkout release automation
-        uses: actions/checkout@v4
-
-      - name: Check whether sync is still needed
-        id: check
+      - name: Check whether sync is still needed (3h)
+        id: check-3h
+        if: steps.check-1h.outputs.synced == 'false' && steps.finalize-1h.outputs.synced != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: node .github/scripts/sync-store-msix.cjs check
 
-      - name: Upload Store MSIX to release
-        if: steps.check.outputs.should_sync == 'true'
+      - name: Upload Store MSIX to release (3h)
+        if: steps.check-3h.outputs.should_sync == 'true'
         continue-on-error: true
         uses: JasonWei512/Upload-Microsoft-Store-MSIX-Package-to-GitHub-Release@v1
         with:
@@ -206,80 +135,12 @@ jobs:
           token: ${{ github.token }}
           asset-name-pattern: BlockInsight_{version}_{arch}
 
-      - name: Finalize release if Store MSIX is available
-        if: steps.check.outputs.should_sync == 'true'
-        id: finalize
-        env:
-          GH_TOKEN: ${{ github.token }}
-          FINAL_ATTEMPT: 'false'
-          IDENTITY_NAME: ${{ env.WINDOWS_PACKAGE_IDENTITY_NAME }}
-          PUBLISHER: ${{ env.WINDOWS_PACKAGE_PUBLISHER }}
-        run: node .github/scripts/sync-store-msix.cjs finalize
-
-      - name: Set sync result
-        if: always()
-        id: result
-        env:
-          CHECK_SYNCED: ${{ steps.check.outputs.synced }}
-          FINALIZE_SYNCED: ${{ steps.finalize.outputs.synced }}
-        run: |
-          if [ "$FINALIZE_SYNCED" = "true" ] || [ "$CHECK_SYNCED" = "true" ]; then
-            echo "synced=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "synced=false" >> "$GITHUB_OUTPUT"
-          fi
-
-  attempt-6h:
-    name: Sync Store-signed MSIX (6h)
-    needs:
-      - attempt-now
-      - attempt-30m
-      - attempt-1h
-      - attempt-3h
-    if: always() && needs.attempt-now.outputs.synced != 'true' && needs.attempt-30m.outputs.synced != 'true' && needs.attempt-1h.outputs.synced != 'true' && needs.attempt-3h.outputs.synced != 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: store-msix-sync-6h
-    outputs:
-      synced: ${{ steps.result.outputs.synced }}
-    steps:
-      - name: Checkout release automation
-        uses: actions/checkout@v4
-
-      - name: Check whether sync is still needed
-        id: check
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node .github/scripts/sync-store-msix.cjs check
-
-      - name: Upload Store MSIX to release
-        if: steps.check.outputs.should_sync == 'true'
-        continue-on-error: true
-        uses: JasonWei512/Upload-Microsoft-Store-MSIX-Package-to-GitHub-Release@v1
-        with:
-          store-id: ${{ env.MICROSOFT_STORE_ID }}
-          token: ${{ github.token }}
-          asset-name-pattern: BlockInsight_{version}_{arch}
-
-      - name: Finalize release if Store MSIX is available
-        if: steps.check.outputs.should_sync == 'true'
-        id: finalize
+      - name: Finalize release if Store MSIX is available (3h)
+        if: steps.check-3h.outputs.should_sync == 'true'
+        id: finalize-3h
         env:
           GH_TOKEN: ${{ github.token }}
           FINAL_ATTEMPT: 'true'
           IDENTITY_NAME: ${{ env.WINDOWS_PACKAGE_IDENTITY_NAME }}
           PUBLISHER: ${{ env.WINDOWS_PACKAGE_PUBLISHER }}
         run: node .github/scripts/sync-store-msix.cjs finalize
-
-      - name: Set sync result
-        if: always()
-        id: result
-        env:
-          CHECK_SYNCED: ${{ steps.check.outputs.synced }}
-          FINALIZE_SYNCED: ${{ steps.finalize.outputs.synced }}
-        run: |
-          if [ "$FINALIZE_SYNCED" = "true" ] || [ "$CHECK_SYNCED" = "true" ]; then
-            echo "synced=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "synced=false" >> "$GITHUB_OUTPUT"
-          fi
