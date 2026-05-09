@@ -7,6 +7,7 @@ const repo = process.env.GITHUB_REPOSITORY
 const outputPath = process.env.GITHUB_OUTPUT
 const tmpDir = process.env.RUNNER_TEMP || process.cwd()
 const finalAttempt = process.env.FINAL_ATTEMPT === 'true'
+const microsoftStoreUrl = 'https://apps.microsoft.com/detail/9P467L4RBQXH'
 
 if (!mode || !tag || !repo) {
   throw new Error('Usage: sync-store-msix.cjs <check|finalize>; RELEASE_TAG and GITHUB_REPOSITORY are required.')
@@ -123,6 +124,7 @@ function buildAppInstaller(packageAsset, packageVersion) {
 
 function buildReleaseNotes(release) {
   const assets = Array.isArray(release.assets) ? release.assets : []
+  const packageAsset = findPackageAsset(assets)
   const winExeAsset = findWindowsExeAsset(assets)
   const macArm64Asset =
     assets.find((asset) => /arm64.*\.dmg$/i.test(asset.name)) ||
@@ -130,11 +132,15 @@ function buildReleaseNotes(release) {
   const macX64Asset = assets.find((asset) => /x64.*\.dmg$/i.test(asset.name))
   const lines = ['## 下载', '']
 
-  const storeText = `[x64](${latestDownloadUrl('BlockInsight.appinstaller')})`
+  const appInstallerText = `[appinstaller（推荐）](${latestDownloadUrl('BlockInsight.appinstaller')})`
+  const microsoftStoreText = `[Microsoft Store](${microsoftStoreUrl})`
+  const appxText = packageAsset
+    ? `[appx](${releaseDownloadUrl(packageAsset.name)})`
+    : 'appx 上传后会在这里显示下载链接'
   const exeText = winExeAsset
-    ? `[exe (x64)](${releaseDownloadUrl(winExeAsset.name)})`
+    ? `[exe](${releaseDownloadUrl(winExeAsset.name)})`
     : 'x64 exe 上传后会在这里显示下载链接'
-  lines.push(`Windows：${storeText}｜ ${exeText}`)
+  lines.push(`Windows (x64)：${appInstallerText}｜ ${microsoftStoreText}｜ ${appxText}｜ ${exeText}`)
 
   const arm64Text = macArm64Asset
     ? `[M 芯片](${releaseDownloadUrl(macArm64Asset.name)})`
