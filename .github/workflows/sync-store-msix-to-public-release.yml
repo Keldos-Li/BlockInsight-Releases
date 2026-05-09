@@ -98,8 +98,10 @@ jobs:
 
   attempt-1h:
     name: Sync Store-signed MSIX (1h)
-    needs: attempt-30m
-    if: always() && needs.attempt-30m.outputs.synced != 'true'
+    needs:
+      - attempt-now
+      - attempt-30m
+    if: always() && needs.attempt-now.outputs.synced != 'true' && needs.attempt-30m.outputs.synced != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: store-msix-sync-1h
@@ -136,8 +138,11 @@ jobs:
 
   attempt-3h:
     name: Sync Store-signed MSIX (3h)
-    needs: attempt-1h
-    if: always() && needs.attempt-1h.outputs.synced != 'true'
+    needs:
+      - attempt-now
+      - attempt-30m
+      - attempt-1h
+    if: always() && needs.attempt-now.outputs.synced != 'true' && needs.attempt-30m.outputs.synced != 'true' && needs.attempt-1h.outputs.synced != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: store-msix-sync-3h
@@ -174,8 +179,12 @@ jobs:
 
   attempt-6h:
     name: Sync Store-signed MSIX (6h)
-    needs: attempt-3h
-    if: always() && needs.attempt-3h.outputs.synced != 'true'
+    needs:
+      - attempt-now
+      - attempt-30m
+      - attempt-1h
+      - attempt-3h
+    if: always() && needs.attempt-now.outputs.synced != 'true' && needs.attempt-30m.outputs.synced != 'true' && needs.attempt-1h.outputs.synced != 'true' && needs.attempt-3h.outputs.synced != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: store-msix-sync-6h

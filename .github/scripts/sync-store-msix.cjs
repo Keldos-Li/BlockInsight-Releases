@@ -56,6 +56,10 @@ function findPackageAsset(assets) {
   )
 }
 
+function findWindowsExeAsset(assets) {
+  return assets.find((asset) => /\.exe$/i.test(asset.name))
+}
+
 function hasAsset(assets, name) {
   return assets.some((asset) => asset.name === name)
 }
@@ -119,13 +123,18 @@ function buildAppInstaller(packageAsset, packageVersion) {
 
 function buildReleaseNotes(release) {
   const assets = Array.isArray(release.assets) ? release.assets : []
+  const winExeAsset = findWindowsExeAsset(assets)
   const macArm64Asset =
     assets.find((asset) => /arm64.*\.dmg$/i.test(asset.name)) ||
     assets.find((asset) => /\.dmg$/i.test(asset.name))
   const macX64Asset = assets.find((asset) => /x64.*\.dmg$/i.test(asset.name))
   const lines = ['## 下载', '']
 
-  lines.push(`Windows：[x64](${latestDownloadUrl('BlockInsight.appinstaller')})`)
+  const storeText = `[x64](${latestDownloadUrl('BlockInsight.appinstaller')})`
+  const exeText = winExeAsset
+    ? `[exe (x64)](${releaseDownloadUrl(winExeAsset.name)})`
+    : 'x64 exe 上传后会在这里显示下载链接'
+  lines.push(`Windows：${storeText}｜ ${exeText}`)
 
   const arm64Text = macArm64Asset
     ? `[M 芯片](${releaseDownloadUrl(macArm64Asset.name)})`
