@@ -7,6 +7,11 @@ on:
         description: 'Draft release tag to finalize, for example v1.1.5.'
         required: true
         type: string
+      sync_now:
+        description: 'Skip the initial 2h wait and try immediately.'
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: sync-store-msix-${{ inputs.release_tag }}
@@ -31,16 +36,17 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Wait before first sync attempt (2h)
+        if: ${{ !inputs.sync_now }}
         run: sleep 7200
 
-      - name: Check whether sync is still needed (2h)
-        id: check-2h
+      - name: Check whether sync is still needed (first attempt)
+        id: check-first
         env:
           GH_TOKEN: ${{ github.token }}
         run: node .github/scripts/sync-store-msix.cjs check
 
-      - name: Upload Store MSIX to release (2h)
-        if: steps.check-2h.outputs.should_sync == 'true'
+      - name: Upload Store MSIX to release (first attempt)
+        if: steps.check-first.outputs.should_sync == 'true'
         continue-on-error: true
         uses: JasonWei512/Upload-Microsoft-Store-MSIX-Package-to-GitHub-Release@v1
         with:
@@ -48,9 +54,9 @@ jobs:
           token: ${{ github.token }}
           asset-name-pattern: BlockInsight_{version}_{arch}
 
-      - name: Finalize release if Store MSIX is available (2h)
-        if: steps.check-2h.outputs.should_sync == 'true'
-        id: finalize-2h
+      - name: Finalize release if Store MSIX is available (first attempt)
+        if: steps.check-first.outputs.should_sync == 'true'
+        id: finalize-first
         env:
           GH_TOKEN: ${{ github.token }}
           FINAL_ATTEMPT: 'false'
@@ -59,12 +65,12 @@ jobs:
         run: node .github/scripts/sync-store-msix.cjs finalize
 
       - name: Wait before retry (3h)
-        if: steps.check-2h.outputs.synced == 'false' && steps.finalize-2h.outputs.synced != 'true'
+        if: steps.check-first.outputs.synced == 'false' && steps.finalize-first.outputs.synced != 'true'
         run: sleep 3600
 
       - name: Check whether sync is still needed (3h)
         id: check-3h
-        if: steps.check-2h.outputs.synced == 'false' && steps.finalize-2h.outputs.synced != 'true'
+        if: steps.check-first.outputs.synced == 'false' && steps.finalize-first.outputs.synced != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: node .github/scripts/sync-store-msix.cjs check
