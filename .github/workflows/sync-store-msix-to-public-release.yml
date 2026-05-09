@@ -28,7 +28,7 @@ jobs:
     timeout-minutes: 15
     environment: store-msix-sync-now
     outputs:
-      synced: ${{ steps.finalize.outputs.synced || steps.check.outputs.synced }}
+      synced: ${{ steps.result.outputs.synced }}
     steps:
       - name: Checkout release automation
         uses: actions/checkout@v4
@@ -57,6 +57,19 @@ jobs:
           IDENTITY_NAME: ${{ env.WINDOWS_PACKAGE_IDENTITY_NAME }}
           PUBLISHER: ${{ env.WINDOWS_PACKAGE_PUBLISHER }}
         run: node .github/scripts/sync-store-msix.cjs finalize
+
+      - name: Set sync result
+        if: always()
+        id: result
+        env:
+          CHECK_SYNCED: ${{ steps.check.outputs.synced }}
+          FINALIZE_SYNCED: ${{ steps.finalize.outputs.synced }}
+        run: |
+          if [ "$FINALIZE_SYNCED" = "true" ] || [ "$CHECK_SYNCED" = "true" ]; then
+            echo "synced=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "synced=false" >> "$GITHUB_OUTPUT"
+          fi
 
   attempt-30m:
     name: Sync Store-signed MSIX (30m)
@@ -66,7 +79,7 @@ jobs:
     timeout-minutes: 15
     environment: store-msix-sync-30m
     outputs:
-      synced: ${{ steps.finalize.outputs.synced || steps.check.outputs.synced }}
+      synced: ${{ steps.result.outputs.synced }}
     steps:
       - name: Checkout release automation
         uses: actions/checkout@v4
@@ -95,6 +108,19 @@ jobs:
           IDENTITY_NAME: ${{ env.WINDOWS_PACKAGE_IDENTITY_NAME }}
           PUBLISHER: ${{ env.WINDOWS_PACKAGE_PUBLISHER }}
         run: node .github/scripts/sync-store-msix.cjs finalize
+
+      - name: Set sync result
+        if: always()
+        id: result
+        env:
+          CHECK_SYNCED: ${{ steps.check.outputs.synced }}
+          FINALIZE_SYNCED: ${{ steps.finalize.outputs.synced }}
+        run: |
+          if [ "$FINALIZE_SYNCED" = "true" ] || [ "$CHECK_SYNCED" = "true" ]; then
+            echo "synced=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "synced=false" >> "$GITHUB_OUTPUT"
+          fi
 
   attempt-1h:
     name: Sync Store-signed MSIX (1h)
@@ -106,7 +132,7 @@ jobs:
     timeout-minutes: 15
     environment: store-msix-sync-1h
     outputs:
-      synced: ${{ steps.finalize.outputs.synced || steps.check.outputs.synced }}
+      synced: ${{ steps.result.outputs.synced }}
     steps:
       - name: Checkout release automation
         uses: actions/checkout@v4
@@ -135,6 +161,19 @@ jobs:
           IDENTITY_NAME: ${{ env.WINDOWS_PACKAGE_IDENTITY_NAME }}
           PUBLISHER: ${{ env.WINDOWS_PACKAGE_PUBLISHER }}
         run: node .github/scripts/sync-store-msix.cjs finalize
+
+      - name: Set sync result
+        if: always()
+        id: result
+        env:
+          CHECK_SYNCED: ${{ steps.check.outputs.synced }}
+          FINALIZE_SYNCED: ${{ steps.finalize.outputs.synced }}
+        run: |
+          if [ "$FINALIZE_SYNCED" = "true" ] || [ "$CHECK_SYNCED" = "true" ]; then
+            echo "synced=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "synced=false" >> "$GITHUB_OUTPUT"
+          fi
 
   attempt-3h:
     name: Sync Store-signed MSIX (3h)
@@ -147,7 +186,7 @@ jobs:
     timeout-minutes: 15
     environment: store-msix-sync-3h
     outputs:
-      synced: ${{ steps.finalize.outputs.synced || steps.check.outputs.synced }}
+      synced: ${{ steps.result.outputs.synced }}
     steps:
       - name: Checkout release automation
         uses: actions/checkout@v4
@@ -176,6 +215,19 @@ jobs:
           IDENTITY_NAME: ${{ env.WINDOWS_PACKAGE_IDENTITY_NAME }}
           PUBLISHER: ${{ env.WINDOWS_PACKAGE_PUBLISHER }}
         run: node .github/scripts/sync-store-msix.cjs finalize
+
+      - name: Set sync result
+        if: always()
+        id: result
+        env:
+          CHECK_SYNCED: ${{ steps.check.outputs.synced }}
+          FINALIZE_SYNCED: ${{ steps.finalize.outputs.synced }}
+        run: |
+          if [ "$FINALIZE_SYNCED" = "true" ] || [ "$CHECK_SYNCED" = "true" ]; then
+            echo "synced=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "synced=false" >> "$GITHUB_OUTPUT"
+          fi
 
   attempt-6h:
     name: Sync Store-signed MSIX (6h)
@@ -189,7 +241,7 @@ jobs:
     timeout-minutes: 15
     environment: store-msix-sync-6h
     outputs:
-      synced: ${{ steps.finalize.outputs.synced || steps.check.outputs.synced }}
+      synced: ${{ steps.result.outputs.synced }}
     steps:
       - name: Checkout release automation
         uses: actions/checkout@v4
@@ -218,3 +270,16 @@ jobs:
           IDENTITY_NAME: ${{ env.WINDOWS_PACKAGE_IDENTITY_NAME }}
           PUBLISHER: ${{ env.WINDOWS_PACKAGE_PUBLISHER }}
         run: node .github/scripts/sync-store-msix.cjs finalize
+
+      - name: Set sync result
+        if: always()
+        id: result
+        env:
+          CHECK_SYNCED: ${{ steps.check.outputs.synced }}
+          FINALIZE_SYNCED: ${{ steps.finalize.outputs.synced }}
+        run: |
+          if [ "$FINALIZE_SYNCED" = "true" ] || [ "$CHECK_SYNCED" = "true" ]; then
+            echo "synced=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "synced=false" >> "$GITHUB_OUTPUT"
+          fi
