@@ -93,7 +93,7 @@ jobs:
   wait-retry-3h:
     name: Wait before retry at 3h
     needs: sync-first-attempt
-    if: ${{ needs.sync-first-attempt.outputs.needs_retry == 'true' }}
+    if: ${{ always() && needs.sync-first-attempt.outputs.needs_retry == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 70
     environment: store-msix-sync-wait-1h
@@ -103,7 +103,7 @@ jobs:
   sync-retry-3h:
     name: Sync Store-signed MSIX retry at 3h
     needs: wait-retry-3h
-    if: ${{ needs.wait-retry-3h.result == 'success' }}
+    if: ${{ always() && needs.wait-retry-3h.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
@@ -157,7 +157,7 @@ jobs:
   wait-retry-4h:
     name: Wait before retry at 4h
     needs: sync-retry-3h
-    if: ${{ needs.sync-retry-3h.outputs.needs_retry == 'true' }}
+    if: ${{ always() && needs.sync-retry-3h.outputs.needs_retry == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 70
     environment: store-msix-sync-wait-1h
@@ -167,7 +167,7 @@ jobs:
   sync-retry-4h:
     name: Sync Store-signed MSIX retry at 4h
     needs: wait-retry-4h
-    if: ${{ needs.wait-retry-4h.result == 'success' }}
+    if: ${{ always() && needs.wait-retry-4h.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
@@ -221,7 +221,7 @@ jobs:
   wait-retry-6h:
     name: Wait before retry at 6h
     needs: sync-retry-4h
-    if: ${{ needs.sync-retry-4h.outputs.needs_retry == 'true' }}
+    if: ${{ always() && needs.sync-retry-4h.outputs.needs_retry == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 130
     environment: store-msix-sync-wait-2h
@@ -231,7 +231,7 @@ jobs:
   sync-retry-6h:
     name: Sync Store-signed MSIX final retry at 6h
     needs: wait-retry-6h
-    if: ${{ needs.wait-retry-6h.result == 'success' }}
+    if: ${{ always() && needs.wait-retry-6h.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
