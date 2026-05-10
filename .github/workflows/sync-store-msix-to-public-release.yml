@@ -44,6 +44,7 @@ jobs:
     timeout-minutes: 30
     outputs:
       synced: ${{ steps.result.outputs.synced }}
+      needs_retry: ${{ steps.result.outputs.needs_retry }}
     steps:
       - name: Checkout release automation
         uses: actions/checkout@v4
@@ -81,12 +82,18 @@ jobs:
           if [ "${{ steps.finalize.outputs.synced }}" = "true" ]; then
             synced="true"
           fi
+          if [ "$synced" = "true" ]; then
+            needs_retry="false"
+          else
+            needs_retry="true"
+          fi
           echo "synced=${synced:-false}" >> "$GITHUB_OUTPUT"
+          echo "needs_retry=$needs_retry" >> "$GITHUB_OUTPUT"
 
   wait-retry-3h:
     name: Wait before retry at 3h
     needs: sync-first-attempt
-    if: ${{ needs.sync-first-attempt.outputs.synced != 'true' }}
+    if: ${{ needs.sync-first-attempt.outputs.needs_retry == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 70
     environment: store-msix-sync-wait-1h
@@ -101,6 +108,7 @@ jobs:
     timeout-minutes: 30
     outputs:
       synced: ${{ steps.result.outputs.synced }}
+      needs_retry: ${{ steps.result.outputs.needs_retry }}
     steps:
       - name: Checkout release automation
         uses: actions/checkout@v4
@@ -138,12 +146,18 @@ jobs:
           if [ "${{ steps.finalize.outputs.synced }}" = "true" ]; then
             synced="true"
           fi
+          if [ "$synced" = "true" ]; then
+            needs_retry="false"
+          else
+            needs_retry="true"
+          fi
           echo "synced=${synced:-false}" >> "$GITHUB_OUTPUT"
+          echo "needs_retry=$needs_retry" >> "$GITHUB_OUTPUT"
 
   wait-retry-4h:
     name: Wait before retry at 4h
     needs: sync-retry-3h
-    if: ${{ needs.sync-retry-3h.outputs.synced != 'true' }}
+    if: ${{ needs.sync-retry-3h.outputs.needs_retry == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 70
     environment: store-msix-sync-wait-1h
@@ -158,6 +172,7 @@ jobs:
     timeout-minutes: 30
     outputs:
       synced: ${{ steps.result.outputs.synced }}
+      needs_retry: ${{ steps.result.outputs.needs_retry }}
     steps:
       - name: Checkout release automation
         uses: actions/checkout@v4
@@ -195,12 +210,18 @@ jobs:
           if [ "${{ steps.finalize.outputs.synced }}" = "true" ]; then
             synced="true"
           fi
+          if [ "$synced" = "true" ]; then
+            needs_retry="false"
+          else
+            needs_retry="true"
+          fi
           echo "synced=${synced:-false}" >> "$GITHUB_OUTPUT"
+          echo "needs_retry=$needs_retry" >> "$GITHUB_OUTPUT"
 
   wait-retry-6h:
     name: Wait before retry at 6h
     needs: sync-retry-4h
-    if: ${{ needs.sync-retry-4h.outputs.synced != 'true' }}
+    if: ${{ needs.sync-retry-4h.outputs.needs_retry == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 130
     environment: store-msix-sync-wait-2h
