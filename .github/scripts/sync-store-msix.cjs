@@ -145,7 +145,7 @@ function buildAppInstaller(packageAsset, packageVersion) {
 `
 }
 
-function buildReleaseNotes(release) {
+function buildDownloadSection(release) {
   const assets = Array.isArray(release.assets) ? release.assets : []
   const packageAsset = findPackageAsset(assets)
   const winExeAsset = findWindowsExeAsset(assets)
@@ -173,15 +173,21 @@ function buildReleaseNotes(release) {
     : 'intel 芯片安装包上传后会在这里显示下载链接'
   lines.push(`macOS：${arm64Text}｜${x64Text}`)
 
+  return lines.join('\n')
+}
+
+function buildReleaseNotes(release) {
+  const lines = []
   const existingBody = stripDownloadSections(typeof release.body === 'string' ? release.body : '')
   const changelogIndex = existingBody.indexOf('## 更新日志')
   if (changelogIndex >= 0) {
-    lines.push('', existingBody.slice(changelogIndex).trim())
+    lines.push(existingBody.slice(changelogIndex).trim())
   } else if (existingBody && !existingBody.startsWith('## 下载')) {
-    lines.push('', '## 更新日志', '', existingBody)
+    lines.push(['## 更新日志', '', existingBody].join('\n'))
   }
 
-  return lines.join('\n')
+  lines.push(buildDownloadSection(release))
+  return lines.join('\n\n')
 }
 
 function uploadTimeoutMarker() {
