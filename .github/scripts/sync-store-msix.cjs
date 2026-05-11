@@ -61,6 +61,29 @@ function findWindowsExeAsset(assets) {
   return assets.find((asset) => /\.exe$/i.test(asset.name))
 }
 
+function stripDownloadSections(body) {
+  const lines = String(body).split(/\r?\n/)
+  const kept = []
+  let skippingDownload = false
+
+  for (const line of lines) {
+    if (/^##\s+下载\s*$/.test(line)) {
+      skippingDownload = true
+      continue
+    }
+
+    if (skippingDownload && /^##\s+/.test(line)) {
+      skippingDownload = false
+    }
+
+    if (!skippingDownload) {
+      kept.push(line)
+    }
+  }
+
+  return kept.join('\n').trim()
+}
+
 function hasAsset(assets, name) {
   return assets.some((asset) => asset.name === name)
 }
@@ -150,7 +173,7 @@ function buildReleaseNotes(release) {
     : 'intel 芯片安装包上传后会在这里显示下载链接'
   lines.push(`macOS：${arm64Text}｜${x64Text}`)
 
-  const existingBody = typeof release.body === 'string' ? release.body.trim() : ''
+  const existingBody = stripDownloadSections(typeof release.body === 'string' ? release.body : '')
   const changelogIndex = existingBody.indexOf('## 更新日志')
   if (changelogIndex >= 0) {
     lines.push('', existingBody.slice(changelogIndex).trim())
